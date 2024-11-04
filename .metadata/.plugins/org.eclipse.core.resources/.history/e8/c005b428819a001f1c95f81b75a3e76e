@@ -1,0 +1,26 @@
+package mvc.command;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+private CartService cartService = new CartService();
+
+public class NotLoginAddCartHandler implements CommandHandler{
+	
+	@Override
+	public String process(HttpServletRequest req, HttpServletResponse resp) throws Exception {
+		 // 1. 요청 메서드 확인
+        if(req.getMethod().equalsIgnoreCase("POST")) {
+            return processSubmit(req, resp);
+        } else if(req.getMethod().equalsIgnoreCase("GET")) {
+            return processForm(req, resp);
+        } else {
+            resp.setStatus(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
+            return null;
+        }
+    }
+	}
+
+
+
+}

@@ -1,0 +1,149 @@
+package mvc.command;
+
+import net.sf.json.JSONObject;
+import net.sf.json.JSONArray;
+import net.sf.json.JSONSerializer;
+
+import java.io.PrintWriter;
+
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+
+import net.sf.json.JSONObject;
+
+
+public class NotLoginAddCartHandler implements CommandHandler{
+	
+	 @Override
+	    public String process(HttpServletRequest request, HttpServletResponse response) throws Exception {
+	        System.out.println("비회원 장바구니 핸들러 진입");
+	        
+	        // 1. 세션 체크로 회원/비회원 구분
+	        HttpSession session = request.getSession();
+	        Integer userId = (Integer)session.getAttribute("userId");
+	        
+	        // 회원이면 회원 장바구니로 리다이렉트
+	        if(userId != null) {
+	            response.sendRedirect(request.getContextPath() + "/cart/memberCart.do");
+	            return null;
+	        }
+	        
+	        // 2. HTTP 메서드에 따른 처리
+	        if(request.getMethod().equalsIgnoreCase("POST")) {
+	            return processSubmit(request, response);
+	        } else if(request.getMethod().equalsIgnoreCase("GET")) {
+	            return processForm(request, response);
+	        }
+	        
+	        return null;
+	    }
+	    
+	    private String processSubmit(HttpServletRequest request, HttpServletResponse response) throws Exception {
+	        // 1. 요청 파라미터 받기
+	        String productId = request.getParameter("productId");
+	        String productName = request.getParameter("productName");
+	        String price = request.getParameter("price");
+	        String imageUrl = request.getParameter("imageUrl");
+	        
+	        // 2. 기존 장바구니 쿠키 확인
+	        Cookie[] cookies = request.getCookies();
+	        String basketItems = null;
+	        
+	        if (cookies != null) {
+	            for (Cookie cookie : cookies) {
+	                if ("basketItems".equals(cookie.getName())) {
+	                    basketItems = cookie.getValue();
+	                    break;
+	                }
+	            }
+	        }
+	        
+	        try {
+	            // 3. JSON 처리
+	            JSONObject cartData;
+	            if (basketItems != null && !basketItems.isEmpty()) {
+	                cartData = new JSONObject.fromObject(basketItems);
+	            } else {
+	                cartData = new JSONObject();
+	            }
+	            
+	            // 4. 상품 정보 업데이트
+	            if (cartData.has(productId)) {
+	                // 이미 있는 상품이면 수량만 증가
+	                JSONObject item = cartData.getJSONObject(productId);
+	                int quantity = item.getInt("quantity") + 1;
+	                item.put("quantity", quantity);
+	            } else {
+	                // 새 상품이면 정보 추가
+	                JSONObject newItem = new JSONObject();
+	                newItem.put("id", productId);
+	                newItem.put("name", productName);
+	                newItem.put("price", price);
+	                newItem.put("quantity", 1);
+	                newItem.put("imageUrl", imageUrl);
+	                
+	                cartData.put(productId, newItem);
+	            }
+	            
+	            // 5. 쿠키 생성/업데이트
+	            Cookie basketCookie = new Cookie("basketItems", cartData.toString());
+	            basketCookie.setPath("/");
+	            basketCookie.setMaxAge(24 * 60 * 60); // 24시간
+	            response.addCookie(basketCookie);
+	            
+	            // 6. 응답 생성
+	            JSONObject jsonResponse = new JSONObject();
+	            jsonResponse.put("success", true);
+	            jsonResponse.put("message", "장바구니에 추가되었습니다.");
+	            jsonResponse.put("cartData", cartData);
+	            
+	            response.setContentType("application/json");
+	            response.setCharacterEncoding("UTF-8");
+	            PrintWriter out = response.getWriter();
+	            out.print(jsonResponse.toString());
+	            out.flush();
+	            
+	        } catch (Exception e) {
+	            e.printStackTrace();
+	            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+	            JSONObject errorResponse = new JSONObject();
+	            errorResponse.put("success", false);
+	            errorResponse.put("message", "장바구니 처리 중 오류가 발생했습니다.");
+	            
+	            response.getWriter().write(errorResponse.toString());
+	        }
+	        
+	        return null;
+	    }
+	    
+	    private String processForm(HttpServletRequest request, HttpServletResponse response) throws Exception {
+	        // 장바구니 페이지 표시를 위한 데이터 준비
+	        Cookie[] cookies = request.getCookies();
+	        if (cookies != null) {
+	            for (Cookie cookie : cookies) {
+	                if ("basketItems".equals(cookie.getName())) {
+	                    JSONObject cartData = new JSONObject();
+	                    request.setAttribute("cartItems", cartData.toString());
+	                    break;
+	                }
+	            }
+	        }
+	        
+	        return "/WEB-INF/views/cart/nonMemberCart.jsp";
+	    }
+	    
+	    // 쿠키 관련 유틸리티 메서드
+	    private Cookie getCookie(HttpServletRequest request, String name) {
+	        Cookie[] cookies = request.getCookies();
+	        if (cookies != null) {
+	            for (Cookie cookie : cookies) {
+	                if (name.equals(cookie.getName())) {
+	                    return cookie;
+	                }
+	            }
+	        }
+	        return null;
+	    }
+	}
